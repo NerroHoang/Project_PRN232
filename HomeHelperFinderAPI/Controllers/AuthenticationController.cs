@@ -178,18 +178,31 @@ namespace HomeHelperFinderAPI.Controllers
                 return BadRequest(ModelState);
             }
 
+            // THAY ĐOẠN NÀY ĐỂ DEBUG:
             var helper = await _helperService.ValidateHelperCredentialsAsync(loginDto.Email, loginDto.Password);
+
             if (helper == null)
             {
-                return Unauthorized(new { message = "Invalid email or password" });
+                // debug: check xem có tìm được helper theo email không
+                var helperByEmail = await _helperService.GetHelperByEmailAsync(loginDto.Email);
+
+                if (helperByEmail == null)
+                {
+                    return Unauthorized(new { debug = "EMAIL_NOT_FOUND" });
+                }
+
+                // có helper, nhưng ValidateCredentials fail => sai pass hoặc rule khác
+                return Unauthorized(new { debug = "PASSWORD_OR_STATUS_INVALID", helperByEmail });
             }
+
             if (helper.IsEmailVerified != true)
             {
-                return Unauthorized(new { message = "Email not verified. Please check your email for the OTP." });
+                return Unauthorized(new { debug = "EMAIL_NOT_VERIFIED", helper });
             }
+
             if (helper.IsActive != true)
             {
-                return Unauthorized(new { message = "Account not active. Awaiting admin approval." });
+                return Unauthorized(new { debug = "HELPER_NOT_ACTIVE", helper });
             }
 
             await _helperService.UpdateLastLoginDateAsync(helper.Id);
@@ -202,6 +215,7 @@ namespace HomeHelperFinderAPI.Controllers
                 helper = helper
             });
         }
+
 
         [HttpPost("login/admin")]
         public async Task<IActionResult> LoginAdmin([FromBody] AdminLoginDto loginDto)
